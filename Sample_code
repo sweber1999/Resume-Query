@@ -1,0 +1,107 @@
+
+Declare @Startdate Datetime
+Declare @Enddate Datetime
+Declare @LicenseType bigint
+
+SELECT @StartDate = ISNULL( {StartDate}, NULL)
+SELECT @EndDate = ISNULL( {EndDate}, NULL)
+SELECT @LicenseType = ISNULL( {LicenseType}, NULL)
+
+Select * FROM 
+(SELECT Distinct
+
+e.eFirstName + ' ' + e.eLastName AS [Employee Name],
+e.ID AS [EmployeeID],
+E.eLicenseNumber AS [License Number],
+ET.EmployeeType AS [License Type],
+E.eTypeID AS [LicenseID],
+EC.Label AS [Checklist],
+A.DateCompleted AS [DateCompleted],
+ISNULL((Select Cast(DateDiff (Day, DateCreated, DateCompleted) AS varchar) 
+FROM Applications Where ID = (Select MAX (ID) FROM Applications Where ChecklistID = EC.ID And ChecklistID IS NOT NULL)), 'No Record')
+AS [Application],
+
+
+ISNULL((Select Cast(DateDiff (Day, SubmittedAt, CompletedAt) AS varchar)  
+	FROM BackgroundChecks bc
+		Where bc.ID = (Select MAX (bc.ID) FROM BackgroundChecks bc WHERE bc.EmployeeID = E.ID)), 'No Record')
+AS [Background Check],
+
+ISNULL((Select Cast(DateDiff (Day, DateCreated, sDateSubmitted) AS varchar) 
+FROM SuitabilityReport 
+	Where 
+		ID = (Select MAX (ID) FROM SuitabilityReport Where ChecklistID = EC.ID And ChecklistID IS NOT NULL)), 'No Record')
+AS [Suitability],
+
+ISNULL((Select Cast(DateDiff (Day, DateCreated, DateSubmitted) AS varchar)
+	FROM NORs 
+		Where ID = (Select MAX (ID) FROM NORs Where ChecklistID = EC.ID And ChecklistID IS NOT NULL)), 'No Record')
+AS [NOR],
+
+ISNULL((Select Cast(DateDiff (Day, DateCreated, DateSubmitted) AS varchar) 
+	FROM NOI 
+		Where ID = (Select MAX (ID) FROM NOI Where ChecklistID = EC.ID And ChecklistID IS NOT NULL)), 'No Record')
+	AS [NOI]
+
+FROM Database.dbo.employees E
+Left JOIN EmployeeChecklists EC ON E.ID = ec.cEmployeeID
+LEFT JOIN EmployeeTypes ET ON E.etypeID = et.ID
+LEFT JOIN Applications A ON E.id = A.EmployeeID
+WHERE ec.ID is not null
+				
+Union
+
+SELECT Distinct
+
+
+e.eFirstName + ' ' + e.eLastName AS [Employee Name],
+e.ID AS [EmployeeID],
+E.eLicenseNumber AS [License Number],
+ET.EmployeeType AS [License Type],
+E.eTypeID AS [LicenseID],
+ISNULL(EC.Label,'Initial License') AS [Checklist],
+A.DateCompleted AS [DateCompleted],
+ISNULL((Select Cast(DateDiff (Day, DateCreated, DateCompleted) AS varchar) 
+FROM Applications Where ID = (Select MAX (ID) FROM Applications Where EmployeeID = E.ID)), 'No Record')
+AS [Application],
+
+
+ISNULL((Select Cast(DateDiff (Day, SubmittedAt, CompletedAt)  AS varchar) 
+	FROM BackgroundChecks bc 
+		Where ID = (Select MAX (ID) FROM BackgroundChecks WHERE bc.EmployeeID = E.ID)), 'No Record')
+AS [Background Check],
+
+
+ISNULL((Select Cast(DateDiff (Day, DateCreated, sDateSubmitted) AS varchar)
+	FROM SuitabilityReport
+		WHERE ID = (Select MAX (ID) ID FROM SuitabilityReport Where sEmployeeID = E.ID)), 'No Record')
+AS [Suitability],
+
+ISNULL((Select Cast(DateDiff (Day, DateCreated, DateSubmitted) AS varchar)
+	FROM NORs
+		Where ID = (Select MAX (ID) FROM NORs Where EmployeeID = E.ID)), 'No Record')
+ AS [NOR],
+
+ISNULL((Select Cast(DateDiff (Day, DateCreated, DateSubmitted) AS varchar) 
+	FROM NOI 
+		Where ID = (Select MAX (ID) FROM NOI Where EmployeeID = E.ID)), 'No Record')
+ AS [NOI]
+
+
+FROM Database.dbo.employees E
+Left JOIN EmployeeChecklists EC ON E.ID = ec.cEmployeeID
+LEFT JOIN EmployeeTypes ET ON E.etypeID = et.ID
+LEFT JOIN Applications A ON E.id = A.EmployeeID
+WHERE EC.ID IS NULL
+) 
+t
+
+WHERE
+T.[LicenseID] = @LicenseType 
+AND  T.[DateCompleted] IS NOT NULL
+AND (@StartDate IS NOT NULL AND @EndDate IS NOT NULL AND T.[DateCompleted] BETWEEN @StartDate AND @EndDate)
+AND ([Application] != 'No Record'
+or [Background Check] != 'No Record'
+or [Suitability] != 'No Record'
+or [NOR] != 'No Record'
+or [NOI] != 'No Record')
